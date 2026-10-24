@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Q-Learning Maze Explorer — Interactive RL</title>
+  <style>
+    /* ===== Reset & Base Theme ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #090d16;
+      color: #e2e8f0;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ===== Header ===== */
+    header {
+      background: #0f172a;
+      border-bottom: 1px solid #1e293b;
+      padding: 12px 28px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    header .logo { font-size: 28px; }
+    header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #38bdf8, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    header .subtitle { font-size: 13px; color: #94a3b8; margin-left: auto; }
+
+    /* ===== Layout ===== */
+    .app-container {
+      display: grid;
+      grid-template-columns: 540px 1fr;
+      gap: 18px;
+      padding: 18px 24px;
+      max-width: 1560px;
+      margin: 0 auto;
+    }
+
+    /* ===== Panels ===== */
+    .panel {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+    .panel-header {
+      background: #1e293b;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel-body { padding: 14px; }
+
+    /* ===== Maze Canvas ===== */
+    #maze-canvas {
+      border-radius: 8px;
+      cursor: crosshair;
+      display: block;
+      margin: 0 auto;
+      background: #090d16;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+    }
+    .maze-legend {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 10px;
+      font-size: 11px;
+      color: #94a3b8;
+      flex-wrap: wrap;
+    }
+    .maze-legend span { display: flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+    /* ===== Buttons & Controls ===== */
+    .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .btn {
+      padding: 7px 14px;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      background: #1e293b;
+      color: #e2e8f0;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:hover { background: #334155; border-color: #475569; }
+    .btn.primary { background: #2563eb; border-color: #3b82f6; color: #fff; }
+    .btn.primary:hover { background: #1d4ed8; }
+    .btn.cyan { background: #0891b2; border-color: #06b6d4; color: #fff; }
+    .btn.cyan:hover { background: #0e7490; }
+    .btn.danger { background: #dc2626; border-color: #ef4444; color: #fff; }
+    .btn.danger:hover { background: #b91c1c; }
+    .btn.success { background: #059669; border-color: #10b981; color: #fff; }
+    .btn.success:hover { background: #047857; }
+    .btn.active-path { background: #d97706; border-color: #f59e0b; color: #fff; }
+
+    /* ===== Sliders ===== */
+    .slider-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .slider-item { display: flex; flex-direction: column; gap: 3px; }
+    .slider-item label {
+      font-size: 11px;
+      color: #94a3b8;
+      display: flex;
+      justify-content: space-between;
+    }
+    .slider-item label span.val {
+      color: #38bdf8;
+      font-weight: 700;
+      font-family: 'Consolas', monospace;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 5px;
+      border-radius: 3px;
+      background: #334155;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: #38bdf8;
+      cursor: pointer;
+    }
+
+    /* ===== Stats Grid ===== */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .stat-card {
+      background: #090d16;
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      padding: 8px 10px;
+      min-width: 0;
+    }
+    .stat-card .stat-label {
+      font-size: 10px;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+    .stat-card .stat-value {
+      font-size: 17px;
+      font-weight: 700;
+      font-family: 'Consolas', monospace;
+      color: #f8fafc;
+      margin-top: 2px;
+    }
+    .stat-card .stat-value.positive { color: #4ade80; }
+    .stat-card .stat-value.negative { color: #f87171; }
+    .stat-card .stat-value.info { color: #38bdf8; }
+    .stat-card .stat-value.gold { color: #fbbf24; }
+
+    /* ===== Action & Formula Bar ===== */
+    .action-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      font-size: 12px;
+      background: #090d16;
+      padding: 7px 10px;
+      border-radius: 6px;
+      border: 1px solid #1e293b;
+      flex-wrap: wrap;
+    }
+    .action-badge {
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .action-badge.explore { background: rgba(124, 58, 237, 0.2); color: #c084fc; border: 1px solid rgba(124, 58, 237, 0.4); }
+    .action-badge.exploit { background: rgba(16, 185, 129, 0.2); color: #4ade80; border: 1px solid rgba(16, 185, 129, 0.4); }
+    .reward-tag {
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-family: 'Consolas', monospace;
+    }
+    .reward-tag.pos { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+    .reward-tag.neg { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+    .formula-box {
+      background: #090d16;
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      padding: 9px 12px;
+      margin-top: 10px;
+      font-family: 'Consolas', monospace;
+      font-size: 11px;
+      line-height: 1.6;
+      color: #94a3b8;
+      overflow-x: auto;
+    }
+    .formula-box .sym { color: #c084fc; }
+    .formula-box .num { color: #fbbf24; }
+    .formula-box .num-pos { color: #4ade80; font-weight: 700; }
+    .formula-box .num-neg { color: #f87171; font-weight: 700; }
+    .formula-box .op { color: #64748b; }
+    .formula-box .highlight { color: #38bdf8; font-weight: 700; }
+
+    /* ===== Reward Chart ===== */
+    #reward-chart {
+      width: 100%;
+      height: 110px;
+      display: block;
+      background: #090d16;
+      border-radius: 6px;
+      border: 1px solid #1e293b;
+    }
+
+    /* ===== Q-Table View ===== */
+    .q-table-scroll {
+      max-height: 380px;
+      overflow-y: auto;
+      border-radius: 0 0 8px 8px;
+      border: 1px solid #1e293b;
+      background: #090d16;
+    }
+    .q-table-scroll::-webkit-scrollbar { width: 6px; }
+    .q-table-scroll::-webkit-scrollbar-track { background: #090d16; }
+    .q-table-scroll::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    table.q-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      font-family: 'Consolas', monospace;
+    }
+    .q-table thead th {
+      background: #1e293b;
+      padding: 7px 10px;
+      text-align: center;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      color: #94a3b8;
+      font-weight: 600;
+      font-size: 11px;
+      border-bottom: 1px solid #334155;
+    }
+    .q-table tbody td {
+      padding: 5px 10px;
+      text-align: center;
+      border-bottom: 1px solid rgba(30, 41, 59, 0.6);
+    }
+    .q-table tbody tr { background: #090d16; }
+    .q-table tbody tr.current-state { background: #172554 !important; outline: 1px solid #38bdf8; }
+    .q-table .state-cell { color: #94a3b8; font-weight: 600; text-align: left; }
+    .q-table .best-action { font-weight: 700; }
+    .q-table .positive-val { color: #4ade80; }
+    .q-table .negative-val { color: #f87171; }
+    .q-table .zero-val { color: #64748b; }
+
+    @media (max-width: 1050px) {
+      .app-container { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🤖</div>
+  <div>
+    <h1>Q-Learning Maze Explorer</h1>
+    <div style="font-size:11px; color:#64748b;">Reinforcement Learning Classroom Visualizer</div>
+  </div>
+  <div class="subtitle" id="status-text">Exit: +100 | Good Direction: +1 | Backtrack: -1 | Wall: -5</div>
+</header>
+
+<div class="app-container">
+  <!-- ===== LEFT COLUMN: MAZE & GRAPH ===== -->
+  <div>
+    <!-- Maze Canvas Panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>🏗️</span> Maze Environment (11×10 Grid World)
+        <span style="margin-left:auto; font-size:11px; color:#64748b;" id="hover-pos">Hover a cell to inspect</span>
+      </div>
+      <div class="panel-body" style="padding: 12px; text-align:center;">
+        <canvas id="maze-canvas"></canvas>
+        <div class="maze-legend">
+          <span><span class="legend-dot" style="background:#16a34a;"></span> Start (1,1)</span>
+          <span><span class="legend-dot" style="background:#eab308;"></span> Exit (8,9) [+100]</span>
+          <span><span class="legend-dot" style="background:#22c55e;"></span> Good Dir (+1)</span>
+          <span><span class="legend-dot" style="background:#ef4444;"></span> Wall Bump (-5)</span>
+          <span><span class="legend-dot" style="background:#f87171;"></span> Backtrack (-1)</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bellman Equation Update -->
+    <div class="panel">
+      <div class="panel-header"><span>📐</span> Real-Time Bellman Equation Update</div>
+      <div class="panel-body" style="padding: 10px 14px;">
+        <div class="formula-box" id="formula-display">
+          <span class="sym">Q(s, a)</span> <span class="op">←</span>
+          <span class="sym">Q(s, a)</span> <span class="op">+</span>
+          <span class="sym">α</span> <span class="op">[</span>
+          <span class="sym">r</span> <span class="op">+</span>
+          <span class="sym">γ</span> <span class="op">max</span><sub>a'</sub> <span class="sym">Q(s', a')</span>
+          <span class="op">-</span> <span class="sym">Q(s, a)</span>
+          <span class="op">]</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Episode Reward Trajectory -->
+    <div class="panel">
+      <div class="panel-header"><span>📈</span> Episode Reward Trajectory</div>
+      <div class="panel-body" style="padding: 10px;">
+        <canvas id="reward-chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== RIGHT COLUMN: CONTROLS & LIVE Q-TABLE ===== -->
+  <div>
+    <!-- Controls Panel -->
+    <div class="panel">
+      <div class="panel-header"><span>🎮</span> Controls & Hyperparameters</div>
+      <div class="panel-body">
+        <div class="btn-row">
+          <button class="btn primary" id="btn-start" onclick="toggleRun()">▶ Start</button>
+          <button class="btn" id="btn-step" onclick="doSingleStep()">⏭ Step Action</button>
+          <button class="btn cyan" id="btn-fast" onclick="runFastEpisodes(10)">⚡ Fast 10</button>
+          <button class="btn success" id="btn-path" onclick="toggleOptimalPath()">🗺️ Optimal Path</button>
+          <button class="btn danger" id="btn-reset" onclick="resetAll()">🔄 Reset</button>
+        </div>
+
+        <div class="slider-grid">
+          <div class="slider-item">
+            <label>Speed <span class="val" id="speed-val">12</span></label>
+            <input type="range" id="speed" min="1" max="25" value="12" oninput="updateSpeed()">
+          </div>
+          <div class="slider-item">
+            <label>ε Exploration <span class="val" id="eps-val">1.00</span></label>
+            <input type="range" id="epsilon" min="0" max="100" value="100" oninput="updateEpsilon()">
+          </div>
+          <div class="slider-item">
+            <label>α Learning Rate <span class="val" id="lr-val">0.25</span></label>
+            <input type="range" id="lr" min="1" max="100" value="25" oninput="updateLR()">
+          </div>
+          <div class="slider-item">
+            <label>γ Discount Factor <span class="val" id="gamma-val">0.95</span></label>
+            <input type="range" id="gamma" min="10" max="99" value="95" oninput="updateGamma()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Statistics Panel -->
+    <div class="panel">
+      <div class="panel-header"><span>📊</span> Agent Training Statistics</div>
+      <div class="panel-body">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Episodes</div>
+            <div class="stat-value info" id="stat-episode">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Wins (Exits)</div>
+            <div class="stat-value positive" id="stat-wins">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Current Ep. Reward</div>
+            <div class="stat-value" id="stat-reward">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Best Ep. Reward</div>
+            <div class="stat-value gold" id="stat-best">—</div>
+          </div>
+        </div>
+
+        <div class="action-row" id="action-info">
+          <span style="color:#64748b;">Ready. Press Start to observe directional learning.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Q-Table Panel -->
+    <div class="panel" style="margin-bottom:0;">
+      <div class="panel-header">
+        <span>📋</span> Up-To-Date Q-Table (State-Action Values)
+        <span style="margin-left:auto; font-size:11px; color:#4ade80;">★ = Best Learned Policy</span>
+      </div>
+      <div class="q-table-scroll">
+        <table class="q-table" id="q-table">
+          <thead>
+            <tr>
+              <th style="width:110px;">State (r, c)</th>
+              <th>↑ Up</th>
+              <th>↓ Down</th>
+              <th>← Left</th>
+              <th>→ Right</th>
+              <th style="width:90px;">★ Policy</th>
+            </tr>
+          </thead>
+          <tbody id="q-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  1. ENVIRONMENT DEFINITION (Intermediate 11×10 Maze)
+// ============================================================
+// 0: path, 1: wall, 2: start, 3: exit
+const MAZE = [
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+  [1, 2, 0, 0, 1, 0, 0, 0, 0, 0, 1],
+  [1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1],
+  [1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+  [1, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1],
+  [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1],
+  [1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1],
+  [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1],
+  [1, 0, 1, 1, 1, 0, 0, 0, 1, 3, 1],
+  [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+];
+
+const ROWS = MAZE.length;
+const COLS = MAZE[0].length;
+const CELL_SIZE = 46;
+
+const ACTIONS = [0, 1, 2, 3]; // 0: Up, 1: Down, 2: Left, 3: Right
+const ACTION_NAMES = ['↑ Up', '↓ Down', '← Left', '→ Right'];
+const ACTION_SYMBOLS = ['↑', '↓', '←', '→'];
+const DR = [-1, 1, 0, 0];
+const DC = [0, 0, -1, 1];
+
+let START = [1, 1];
+let EXIT = [8, 9];
+for (let r = 0; r < ROWS; r++) {
+  for (let c = 0; c < COLS; c++) {
+    if (MAZE[r][c] === 2) START = [r, c];
+    if (MAZE[r][c] === 3) EXIT = [r, c];
+  }
+}
+
+// All walkable states
+const STATES = [];
+for (let r = 0; r < ROWS; r++) {
+  for (let c = 0; c < COLS; c++) {
+    if (MAZE[r][c] !== 1) STATES.push([r, c]);
+  }
+}
+
+// Exact shortest path distance from every cell to exit (computed via BFS)
+const distToExit = {};
+{
+  const queue = [[EXIT[0], EXIT[1], 0]];
+  distToExit[`${EXIT[0]},${EXIT[1]}`] = 0;
+  while (queue.length > 0) {
+    const [cr, cc, d] = queue.shift();
+    for (let a = 0; a < 4; a++) {
+      const nr = cr + DR[a], nc = cc + DC[a];
+      const key = `${nr},${nc}`;
+      if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && MAZE[nr][nc] !== 1 && !(key in distToExit)) {
+        distToExit[key] = d + 1;
+        queue.push([nr, nc, d + 1]);
+      }
+    }
+  }
+}
+
+// ============================================================
+//  CLEAN & INTUITIVE REWARD STRUCTURE (No Direction Mismatches)
+// ============================================================
+// 1. Goal Reached (🏁): +100.0 (Big positive goal reward)
+// 2. Good Direction:     +1.0 (Positive reward for moving closer to exit!)
+// 3. Bad Direction:      -1.0 (Negative penalty for backtracking/moving away)
+// 4. Wall Collision (🧱): -5.0 (Negative punishment for crashing into wall)
+const REWARD_EXIT = 100.0;
+const REWARD_GOOD_DIR = 1.0;
+const REWARD_BAD_DIR = -1.0;
+const REWARD_WALL = -5.0;
+const MAX_STEPS = 600;
+
+// Hyperparameters
+let alpha = 0.25;
+let gamma = 0.95;
+let epsilon = 1.0;
+let epsilonDecay = 0.88;
+let epsilonMin = 0.05;
+
+// Agent & Simulation State
+let Q = {};
+let agentR = START[0], agentC = START[1];
+let episode = 0;
+let stepCount = 0;
+let currentEpReward = 0.0;
+let bestReward = -Infinity;
+let wins = 0;
+let rewardHistory = [];
+let running = false;
+let showOptimal = false;
+let lastAction = -1;
+let lastExplored = false;
+let lastUpdate = null;
+let animTimer = null;
+let speed = 12;
+
+function initQ() {
+  Q = {};
+  for (const [r, c] of STATES) {
+    const qList = [];
+    for (let a = 0; a < 4; a++) {
+      const nr = r + DR[a], nc = c + DC[a];
+      if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || MAZE[nr][nc] === 1) {
+        qList.push(-5.0); // Wall action initialized to penalty
+      } else {
+        qList.push(0.0);  // Open path initialized to 0.0
+      }
+    }
+    Q[`${r},${c}`] = qList;
+  }
+}
+
+function stateKey(r, c) { return `${r},${c}`; }
+
+// Action selection (ε-greedy with tie-breaking)
+function chooseAction(r, c) {
+  if (Math.random() < epsilon) {
+    lastExplored = true;
+    return ACTIONS[Math.floor(Math.random() * 4)];
+  }
+  lastExplored = false;
+  const qVals = Q[stateKey(r, c)];
+  let maxQ = -Infinity, best = [];
+  for (let a = 0; a < 4; a++) {
+    if (qVals[a] > maxQ) { maxQ = qVals[a]; best = [a]; }
+    else if (Math.abs(qVals[a] - maxQ) < 1e-4) { best.push(a); }
+  }
+  return best[Math.floor(Math.random() * best.length)];
+}
+
+// Single step execution
+function step() {
+  const action = chooseAction(agentR, agentC);
+  lastAction = action;
+  const nr = agentR + DR[action];
+  const nc = agentC + DC[action];
+
+  let reward, newR, newC, maxNextQ, dirFeedback;
+  const sk = stateKey(agentR, agentC);
+
+  if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || MAZE[nr][nc] === 1) {
+    // 🧱 Wall Collision Punishment
+    reward = REWARD_WALL;
+    newR = agentR;
+    newC = agentC;
+    maxNextQ = 0.0; // Wall is non-navigable
+    dirFeedback = 'Wall Crash (-5)';
+  } else if (MAZE[nr][nc] === 3) {
+    // 🏁 Goal Reached Reward
+    reward = REWARD_EXIT;
+    newR = nr;
+    newC = nc;
+    maxNextQ = 0.0; // Terminal goal
+    dirFeedback = 'Exit Goal Reached (+100)';
+  } else {
+    // Navigating along path: Check if getting closer to exit or further
+    const currDist = distToExit[sk];
+    const nextDist = distToExit[stateKey(nr, nc)];
+    if (nextDist < currDist) {
+      // ✅ Good direction: Moving closer to the exit!
+      reward = REWARD_GOOD_DIR; // +1.0
+      dirFeedback = 'Good Direction (Closer to Exit) (+1)';
+    } else {
+      // ❌ Bad direction: Moving further from exit / backtracking
+      reward = REWARD_BAD_DIR;  // -1.0
+      dirFeedback = 'Backtracking / Moving Away (-1)';
+    }
+    newR = nr;
+    newC = nc;
+    maxNextQ = Math.max(...Q[stateKey(newR, newC)]);
+  }
+
+  // Bellman update: Q(s,a) = Q(s,a) + alpha * [ r + gamma * maxQ(s') - Q(s,a) ]
+  const oldQ = Q[sk][action];
+  const newQ = oldQ + alpha * (reward + gamma * maxNextQ - oldQ);
+  Q[sk][action] = newQ;
+
+  lastUpdate = { s: sk, a: action, r: reward, sn: stateKey(newR, newC), oldQ, maxNextQ, newQ, dirFeedback };
+
+  agentR = newR;
+  agentC = newC;
+  stepCount++;
+  currentEpReward += reward;
+
+  const reachedGoal = (MAZE[agentR][agentC] === 3);
+  const done = reachedGoal || stepCount >= MAX_STEPS;
+
+  if (done) {
+    episode++;
+    if (currentEpReward > bestReward) bestReward = currentEpReward;
+    rewardHistory.push(currentEpReward);
+
+    if (reachedGoal) {
+      wins++;
+      epsilon = Math.max(epsilonMin, epsilon * epsilonDecay);
+      updateEpsilonSlider();
+    }
+
+    // Reset agent position for next episode
+    agentR = START[0];
+    agentC = START[1];
+    stepCount = 0;
+    currentEpReward = 0.0;
+  }
+
+  return done;
+}
+
+// ============================================================
+//  2. RENDERING CANVAS & Q-HEATMAP
+// ============================================================
+const mazeCanvas = document.getElementById('maze-canvas');
+const mCtx = mazeCanvas.getContext('2d');
+mazeCanvas.width = COLS * CELL_SIZE;
+mazeCanvas.height = ROWS * CELL_SIZE;
+
+function qColor(val, isWall) {
+  if (isWall) return 'rgba(239, 68, 68, 0.45)';
+  if (Math.abs(val) < 1e-4) return 'rgba(30, 41, 59, 0.4)';
+  if (val > 0) {
+    const intensity = Math.min(val / 50.0, 1.0);
+    return `rgba(74, 222, 128, ${0.25 + 0.65 * intensity})`;
+  } else {
+    const intensity = Math.min(Math.abs(val) / 5.0, 1.0);
+    return `rgba(248, 113, 113, ${0.25 + 0.65 * intensity})`;
+  }
+}
+
+function drawMaze() {
+  mCtx.clearRect(0, 0, mazeCanvas.width, mazeCanvas.height);
+
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      const x = c * CELL_SIZE, y = r * CELL_SIZE;
+      const cell = MAZE[r][c];
+
+      if (cell === 1) {
+        // Wall
+        mCtx.fillStyle = '#1e293b';
+        mCtx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+        mCtx.strokeStyle = '#334155';
+        mCtx.lineWidth = 1;
+        mCtx.strokeRect(x + 0.5, y + 0.5, CELL_SIZE - 1, CELL_SIZE - 1);
+        continue;
+      }
+
+      // Path
+      mCtx.fillStyle = '#090d16';
+      mCtx.fillRect(x, y, CELL_SIZE, CELL_SIZE);
+      mCtx.strokeStyle = '#1e293b';
+      mCtx.lineWidth = 0.5;
+      mCtx.strokeRect(x, y, CELL_SIZE, CELL_SIZE);
+
+      const key = stateKey(r, c);
+      const qVals = Q[key];
+      const cx = x + CELL_SIZE / 2;
+      const cy = y + CELL_SIZE / 2;
+      const pad = 2;
+
+      const isWallA = [
+        r - 1 < 0 || MAZE[r - 1][c] === 1,
+        r + 1 >= ROWS || MAZE[r + 1][c] === 1,
+        c - 1 < 0 || MAZE[r][c - 1] === 1,
+        c + 1 >= COLS || MAZE[r][c + 1] === 1,
+      ];
+
+      // Draw 4 directional triangles
+      // Up
+      mCtx.fillStyle = qColor(qVals[0], isWallA[0]);
+      mCtx.beginPath();
+      mCtx.moveTo(x + pad, y + pad);
+      mCtx.lineTo(x + CELL_SIZE - pad, y + pad);
+      mCtx.lineTo(cx, cy);
+      mCtx.closePath();
+      mCtx.fill();
+
+      // Down
+      mCtx.fillStyle = qColor(qVals[1], isWallA[1]);
+      mCtx.beginPath();
+      mCtx.moveTo(x + pad, y + CELL_SIZE - pad);
+      mCtx.lineTo(x + CELL_SIZE - pad, y + CELL_SIZE - pad);
+      mCtx.lineTo(cx, cy);
+      mCtx.closePath();
+      mCtx.fill();
+
+      // Left
+      mCtx.fillStyle = qColor(qVals[2], isWallA[2]);
+      mCtx.beginPath();
+      mCtx.moveTo(x + pad, y + pad);
+      mCtx.lineTo(x + pad, y + CELL_SIZE - pad);
+      mCtx.lineTo(cx, cy);
+      mCtx.closePath();
+      mCtx.fill();
+
+      // Right
+      mCtx.fillStyle = qColor(qVals[3], isWallA[3]);
+      mCtx.beginPath();
+      mCtx.moveTo(x + CELL_SIZE - pad, y + pad);
+      mCtx.lineTo(x + CELL_SIZE - pad, y + CELL_SIZE - pad);
+      mCtx.lineTo(cx, cy);
+      mCtx.closePath();
+      mCtx.fill();
+
+      // Direction Arrow: Only draw for valid path with knowledge
+      let bestA = 0, bestVal = -Infinity;
+      for (let a = 0; a < 4; a++) {
+        if (!isWallA[a] && qVals[a] > bestVal) {
+          bestVal = qVals[a];
+          bestA = a;
+        }
+      }
+
+      if (bestVal > -4.9) {
+        mCtx.fillStyle = '#ffffff';
+        mCtx.font = 'bold 13px Consolas';
+        mCtx.textAlign = 'center';
+        mCtx.textBaseline = 'middle';
+        mCtx.fillText(ACTION_SYMBOLS[bestA], cx, cy);
+      }
+
+      // Start Marker
+      if (cell === 2) {
+        mCtx.strokeStyle = '#22c55e';
+        mCtx.lineWidth = 2;
+        mCtx.strokeRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+        mCtx.fillStyle = '#4ade80';
+        mCtx.font = 'bold 9px Segoe UI';
+        mCtx.textAlign = 'center';
+        mCtx.fillText('START', cx, y + 10);
+      }
+
+      // Exit Marker
+      if (cell === 3) {
+        mCtx.fillStyle = 'rgba(234, 179, 8, 0.25)';
+        mCtx.fillRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+        mCtx.strokeStyle = '#eab308';
+        mCtx.lineWidth = 2;
+        mCtx.strokeRect(x + 2, y + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+        mCtx.fillStyle = '#fbbf24';
+        mCtx.font = '18px serif';
+        mCtx.textAlign = 'center';
+        mCtx.textBaseline = 'middle';
+        mCtx.fillText('🏁', cx, cy);
+      }
+    }
+  }
+
+  // Draw Optimal Path Line if active
+  if (showOptimal) {
+    drawLearnedPath();
+  }
+
+  // Draw Robot Agent
+  const rx = agentC * CELL_SIZE + CELL_SIZE / 2;
+  const ry = agentR * CELL_SIZE + CELL_SIZE / 2;
+  mCtx.fillStyle = '#38bdf8';
+  mCtx.beginPath();
+  mCtx.arc(rx, ry, CELL_SIZE * 0.28, 0, Math.PI * 2);
+  mCtx.fill();
+  mCtx.strokeStyle = '#e0f2fe';
+  mCtx.lineWidth = 2;
+  mCtx.stroke();
+
+  // Robot Eyes
+  mCtx.fillStyle = '#0f172a';
+  mCtx.beginPath();
+  mCtx.arc(rx - 4, ry - 2, 2, 0, Math.PI * 2);
+  mCtx.arc(rx + 4, ry - 2, 2, 0, Math.PI * 2);
+  mCtx.fill();
+}
+
+function drawLearnedPath() {
+  let curr = [START[0], START[1]];
+  const visited = new Set();
+  const path = [[curr[0], curr[1]]];
+
+  for (let s = 0; s < 50; s++) {
+    if (curr[0] === EXIT[0] && curr[1] === EXIT[1]) break;
+    const key = stateKey(curr[0], curr[1]);
+    if (visited.has(key)) break;
+    visited.add(key);
+
+    const qVals = Q[key];
+    if (!qVals) break;
+
+    let bestA = -1, bestV = -Infinity;
+    for (let a = 0; a < 4; a++) {
+      const nr = curr[0] + DR[a], nc = curr[1] + DC[a];
+      if (nr >= 0 && nr < ROWS && nc >= 0 && nc < COLS && MAZE[nr][nc] !== 1) {
+        if (qVals[a] > bestV) { bestV = qVals[a]; bestA = a; }
+      }
+    }
+
+    if (bestA === -1) break;
+    curr[0] += DR[bestA];
+    curr[1] += DC[bestA];
+    path.push([curr[0], curr[1]]);
+  }
+
+  if (path.length > 1) {
+    mCtx.strokeStyle = '#fbbf24';
+    mCtx.lineWidth = 3;
+    mCtx.setLineDash([5, 3]);
+    mCtx.beginPath();
+    mCtx.moveTo(path[0][1] * CELL_SIZE + CELL_SIZE / 2, path[0][0] * CELL_SIZE + CELL_SIZE / 2);
+    for (let i = 1; i < path.length; i++) {
+      mCtx.lineTo(path[i][1] * CELL_SIZE + CELL_SIZE / 2, path[i][0] * CELL_SIZE + CELL_SIZE / 2);
+    }
+    mCtx.stroke();
+    mCtx.setLineDash([]);
+  }
+}
+
+// ============================================================
+//  3. REWARD TRAJECTORY CHART (Both positive and negative)
+// ============================================================
+const chartCanvas = document.getElementById('reward-chart');
+const cCtx = chartCanvas.getContext('2d');
+let cachedChartWidth = 0, cachedChartHeight = 0;
+
+function drawRewardChart() {
+  const w = chartCanvas.clientWidth;
+  const h = chartCanvas.clientHeight;
+  if (w <= 0 || h <= 0) return;
+
+  if (w !== cachedChartWidth || h !== cachedChartHeight) {
+    cachedChartWidth = w;
+    cachedChartHeight = h;
+    chartCanvas.width = w * window.devicePixelRatio;
+    chartCanvas.height = h * window.devicePixelRatio;
+    cCtx.setTransform(1, 0, 0, 1, 0, 0);
+    cCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  }
+
+  cCtx.clearRect(0, 0, w, h);
+
+  if (rewardHistory.length < 2) {
+    cCtx.fillStyle = '#64748b';
+    cCtx.font = '11px Segoe UI';
+    cCtx.textAlign = 'center';
+    cCtx.fillText('Trajectory will appear after 2+ episodes', w / 2, h / 2);
+    return;
+  }
+
+  const pts = rewardHistory.slice(-80);
+  const minV = Math.min(...pts);
+  const maxV = Math.max(...pts);
+  const range = (maxV - minV) || 1.0;
+  const padX = 35, padY = 15;
+  const pw = w - padX - 15;
+  const ph = h - 2 * padY;
+
+  // Zero reference dashed line
+  if (minV <= 0 && maxV >= 0) {
+    const zy = h - padY - ((0 - minV) / range) * ph;
+    cCtx.strokeStyle = '#334155';
+    cCtx.setLineDash([3, 3]);
+    cCtx.beginPath();
+    cCtx.moveTo(padX, zy);
+    cCtx.lineTo(w - 15, zy);
+    cCtx.stroke();
+    cCtx.setLineDash([]);
+  }
+
+  // Curve
+  cCtx.strokeStyle = '#38bdf8';
+  cCtx.lineWidth = 2;
+  cCtx.beginPath();
+  for (let i = 0; i < pts.length; i++) {
+    const px = padX + (i / (pts.length - 1)) * pw;
+    const py = h - padY - ((pts[i] - minV) / range) * ph;
+    if (i === 0) cCtx.moveTo(px, py);
+    else cCtx.lineTo(px, py);
+  }
+  cCtx.stroke();
+
+  // Y-axis labels
+  cCtx.fillStyle = '#94a3b8';
+  cCtx.font = '9px Consolas';
+  cCtx.textAlign = 'right';
+  cCtx.fillText(maxV.toFixed(0), padX - 6, padY + 8);
+  cCtx.fillText(minV.toFixed(0), padX - 6, h - padY);
+}
+
+// ============================================================
+//  4. CLEAN Q-TABLE UPDATE
+// ============================================================
+function buildInitialQTable() {
+  const tbody = document.getElementById('q-table-body');
+  let html = '';
+  for (const [r, c] of STATES) {
+    const key = `${r}_${c}`;
+    const isExit = (r === EXIT[0] && c === EXIT[1]);
+    const isStart = (r === START[0] && c === START[1]);
+    const icon = isExit ? '🏁 ' : (isStart ? '🟢 ' : '');
+    html += `<tr id="row-${key}">
+      <td class="state-cell">${icon}(${r}, ${c})</td>
+      <td id="cell-${key}-0" class="zero-val">0.00</td>
+      <td id="cell-${key}-1" class="zero-val">0.00</td>
+      <td id="cell-${key}-2" class="zero-val">0.00</td>
+      <td id="cell-${key}-3" class="zero-val">0.00</td>
+      <td id="cell-${key}-best" style="font-weight:700; color:#64748b;">—</td>
+    </tr>`;
+  }
+  tbody.innerHTML = html;
+}
+
+let lastHighlightedRow = null;
+
+function updateQTableRow(r, c) {
+  const key = `${r}_${c}`;
+  const rowEl = document.getElementById(`row-${key}`);
+  if (!rowEl) return;
+
+  const qVals = Q[`${r},${c}`];
+  let bestA = -1, bestV = -Infinity;
+  for (let a = 0; a < 4; a++) {
+    const nr = r + DR[a], nc = c + DC[a];
+    const isWall = (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS || MAZE[nr][nc] === 1);
+    if (!isWall && qVals[a] > bestV) {
+      bestV = qVals[a];
+      bestA = a;
+    }
+  }
+
+  for (let a = 0; a < 4; a++) {
+    const cellEl = document.getElementById(`cell-${key}-${a}`);
+    const v = qVals[a];
+    cellEl.textContent = v.toFixed(2);
+    if (v > 1e-4) {
+      cellEl.className = 'positive-val' + (a === bestA ? ' best-action' : '');
+    } else if (v < -1e-4) {
+      cellEl.className = 'negative-val' + (a === bestA ? ' best-action' : '');
+    } else {
+      cellEl.className = 'zero-val';
+    }
+  }
+
+  const bestEl = document.getElementById(`cell-${key}-best`);
+  if (bestA !== -1 && bestV > -4.9) {
+    bestEl.textContent = ACTION_NAMES[bestA];
+    bestEl.style.color = (bestV >= 0) ? '#4ade80' : '#f87171';
+  } else {
+    bestEl.textContent = '—';
+    bestEl.style.color = '#64748b';
+  }
+}
+
+function highlightCurrentState(r, c) {
+  if (lastHighlightedRow) {
+    lastHighlightedRow.classList.remove('current-state');
+  }
+  const key = `${r}_${c}`;
+  const row = document.getElementById(`row-${key}`);
+  if (row) {
+    row.classList.add('current-state');
+    lastHighlightedRow = row;
+  }
+}
+
+function refreshEntireQTable() {
+  for (const [r, c] of STATES) {
+    updateQTableRow(r, c);
+  }
+}
+
+// ============================================================
+//  5. UI LABELS & STATUS UPDATES
+// ============================================================
+function updateStatsUI() {
+  document.getElementById('stat-episode').textContent = episode;
+  document.getElementById('stat-wins').textContent = wins;
+  const rewEl = document.getElementById('stat-reward');
+  rewEl.textContent = currentEpReward.toFixed(0);
+  rewEl.className = 'stat-value ' + (currentEpReward >= 0 ? 'positive' : 'negative');
+
+  const bestEl = document.getElementById('stat-best');
+  bestEl.textContent = (bestReward === -Infinity) ? '—' : bestReward.toFixed(0);
+
+  if (lastAction >= 0 && lastUpdate) {
+    const modeClass = lastExplored ? 'explore' : 'exploit';
+    const modeText = lastExplored ? 'Explore (Random)' : 'Exploit (Greedy)';
+    const tagClass = (lastUpdate.r > 0) ? 'pos' : 'neg';
+    const rSign = (lastUpdate.r > 0) ? `+${lastUpdate.r.toFixed(0)}` : `${lastUpdate.r.toFixed(0)}`;
+
+    document.getElementById('action-info').innerHTML = `
+      <span class="action-badge ${modeClass}">${modeText}</span>
+      <span>Action: <strong>${ACTION_NAMES[lastAction]}</strong></span>
+      <span class="reward-tag ${tagClass}">Reward: ${rSign} [${lastUpdate.dirFeedback}]</span>
+      <span style="color:#64748b; font-size:11px; margin-left:auto;">State: (${agentR}, ${agentC}) | ε = ${epsilon.toFixed(2)}</span>
+    `;
+
+    const u = lastUpdate;
+    const rClass = (u.r > 0) ? 'num-pos' : 'num-neg';
+    const rStr = (u.r > 0) ? `+${u.r.toFixed(1)}` : `${u.r.toFixed(1)}`;
+    document.getElementById('formula-display').innerHTML = `
+      <span class="sym">Q((${u.s}), ${ACTION_SYMBOLS[u.a]})</span> <span class="op">←</span>
+      <span class="num">${u.oldQ.toFixed(2)}</span> <span class="op">+</span>
+      <span class="num">${alpha.toFixed(2)}</span> <span class="op">×</span> <span class="op">[</span>
+      <span class="${rClass}">${rStr}</span> <span class="op">+</span>
+      <span class="num">${gamma.toFixed(2)}</span> <span class="op">×</span> <span class="num">${u.maxNextQ.toFixed(2)}</span>
+      <span class="op">-</span> <span class="num">${u.oldQ.toFixed(2)}</span>
+      <span class="op">]</span> <span class="op">=</span> <span class="highlight">${u.newQ.toFixed(2)}</span>
+    `;
+  }
+}
+
+// ============================================================
+//  6. CONTROLS & TRAINING LOOP
+// ============================================================
+function updateSpeed() {
+  speed = parseInt(document.getElementById('speed').value);
+  document.getElementById('speed-val').textContent = speed;
+}
+function updateEpsilon() {
+  epsilon = parseInt(document.getElementById('epsilon').value) / 100;
+  document.getElementById('eps-val').textContent = epsilon.toFixed(2);
+}
+function updateEpsilonSlider() {
+  document.getElementById('epsilon').value = Math.round(epsilon * 100);
+  document.getElementById('eps-val').textContent = epsilon.toFixed(2);
+}
+function updateLR() {
+  alpha = parseInt(document.getElementById('lr').value) / 100;
+  document.getElementById('lr-val').textContent = alpha.toFixed(2);
+}
+function updateGamma() {
+  gamma = parseInt(document.getElementById('gamma').value) / 100;
+  document.getElementById('gamma-val').textContent = gamma.toFixed(2);
+}
+
+function doSingleStep() {
+  if (running) return;
+  const prevR = agentR, prevC = agentC;
+  step();
+  updateQTableRow(prevR, prevC);
+  highlightCurrentState(agentR, agentC);
+  drawMaze();
+  drawRewardChart();
+  updateStatsUI();
+}
+
+function runFastEpisodes(n = 10) {
+  const wasRunning = running;
+  running = false;
+  clearTimeout(animTimer);
+
+  for (let i = 0; i < n; i++) {
+    agentR = START[0];
+    agentC = START[1];
+    stepCount = 0;
+    currentEpReward = 0.0;
+    let done = false;
+    while (!done) {
+      done = step();
+    }
+  }
+
+  refreshEntireQTable();
+  highlightCurrentState(agentR, agentC);
+  drawMaze();
+  drawRewardChart();
+  updateStatsUI();
+  document.getElementById('status-text').textContent = `Trained ${n} episodes. Total wins: ${wins}.`;
+
+  if (wasRunning) {
+    toggleRun();
+  }
+}
+
+function toggleOptimalPath() {
+  showOptimal = !showOptimal;
+  const btn = document.getElementById('btn-path');
+  if (showOptimal) {
+    btn.classList.add('active-path');
+  } else {
+    btn.classList.remove('active-path');
+  }
+  drawMaze();
+}
+
+function toggleRun() {
+  running = !running;
+  const btn = document.getElementById('btn-start');
+  if (running) {
+    btn.textContent = '⏸ Pause';
+    btn.className = 'btn danger';
+    document.getElementById('status-text').textContent = 'Training running...';
+    runLoop();
+  } else {
+    btn.textContent = '▶ Start';
+    btn.className = 'btn primary';
+    document.getElementById('status-text').textContent = 'Training paused.';
+    clearTimeout(animTimer);
+  }
+}
+
+function runLoop() {
+  if (!running) return;
+
+  const prevR = agentR, prevC = agentC;
+  const done = step();
+
+  updateQTableRow(prevR, prevC);
+  highlightCurrentState(agentR, agentC);
+  drawMaze();
+  updateStatsUI();
+
+  if (done) {
+    drawRewardChart();
+  }
+
+  const delay = Math.max(8, 220 - speed * 8.5);
+  animTimer = setTimeout(runLoop, delay);
+}
+
+function resetAll() {
+  running = false;
+  clearTimeout(animTimer);
+  document.getElementById('btn-start').textContent = '▶ Start';
+  document.getElementById('btn-start').className = 'btn primary';
+
+  initQ();
+  agentR = START[0];
+  agentC = START[1];
+  episode = 0;
+  stepCount = 0;
+  currentEpReward = 0.0;
+  bestReward = -Infinity;
+  wins = 0;
+  rewardHistory = [];
+  epsilon = 1.0;
+  updateEpsilonSlider();
+  lastAction = -1;
+  lastUpdate = null;
+
+  refreshEntireQTable();
+  highlightCurrentState(agentR, agentC);
+  drawMaze();
+  drawRewardChart();
+  updateStatsUI();
+  document.getElementById('status-text').textContent = 'Reset to initial state.';
+}
+
+// Hover interaction
+mazeCanvas.addEventListener('mousemove', (e) => {
+  const rect = mazeCanvas.getBoundingClientRect();
+  const c = Math.floor((e.clientX - rect.left) / CELL_SIZE);
+  const r = Math.floor((e.clientY - rect.top) / CELL_SIZE);
+  if (r >= 0 && r < ROWS && c >= 0 && c < COLS && MAZE[r][c] !== 1) {
+    const q = Q[`${r},${c}`];
+    document.getElementById('hover-pos').textContent =
+      `Cell (${r},${c}) → ↑${q[0].toFixed(1)} ↓${q[1].toFixed(1)} ←${q[2].toFixed(1)} →${q[3].toFixed(1)}`;
+  }
+});
+
+mazeCanvas.addEventListener('mouseleave', () => {
+  document.getElementById('hover-pos').textContent = 'Hover a cell to inspect';
+});
+
+// ============================================================
+//  7. INITIALIZATION
+// ============================================================
+initQ();
+buildInitialQTable();
+refreshEntireQTable();
+highlightCurrentState(START[0], START[1]);
+drawMaze();
+drawRewardChart();
+updateStatsUI();
+</script>
+</body>
+</html>
