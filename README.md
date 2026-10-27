@@ -9,18 +9,6 @@
 An interactive, educational reinforcement learning visualizer built for teaching **Q-Learning** and the **Bellman Equation** to college students and machine learning beginners. Features dual implementations: a pure-Python desktop GUI (`tkinter`) and a responsive web application (`HTML5 Canvas` + `Vanilla JS`) — both completely standalone with **zero external dependencies**.
 
 ---
-
-## 📌 Repository "About" Description (Copy & Paste for GitHub)
-
-```text
-Interactive 2D Q-Learning visualizer built for teaching Reinforcement Learning. Features live Bellman equation updates, dynamic Q-table evolution, policy arrow overlays, and convergence charts. Available in pure Python (Tkinter) and Vanilla JS/HTML5 Canvas with zero dependencies.
-```
-
-### Recommended GitHub Topics (Tags)
-`reinforcement-learning` • `q-learning` • `machine-learning` • `bellman-equation` • `maze-solver` • `educational` • `python` • `tkinter` • `html5-canvas` • `artificial-intelligence` • `interactive-visualization`
-
----
-
 ## 🎯 Educational Motivation & Learning Objectives
 
 When students learn tabular Q-learning, formulas like the Bellman update often feel abstract. This project brings the mathematics to life by letting students watch an agent navigate an intermediate-complexity maze in real time.
